@@ -18,19 +18,15 @@
       margin-bottom: 20px;
     }
 
-    input[type="hidden"] {
-      margin-top: 10px;
-    }
-
     button {
-      margin: 10px;
-      padding: 12px 20px;
+      margin: 6px;
+      padding: 10px 18px;
       background: #00796b;
       color: white;
       border: none;
       border-radius: 8px;
       cursor: pointer;
-      font-size: 16px;
+      font-size: 15px;
       transition: background 0.3s ease;
     }
 
@@ -38,29 +34,46 @@
       background: #004d40;
     }
 
-    img {
-      margin-top: 20px;
-      max-width: 90%;
-      border-radius: 12px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
-
     #status {
-      margin-top: 20px;
+      margin-top: 15px;
       font-weight: bold;
     }
 
     a {
       display: block;
       margin-top: 15px;
-      font-size: 18px;
+      font-size: 16px;
       color: #0077cc;
       word-break: break-word;
     }
 
     #linkResult {
       margin-top: 20px;
-      font-size: 16px;
+      font-size: 15px;
+    }
+
+    #imageContainer {
+      width: 500px;
+      height: 400px;
+      margin: 20px auto;
+      border: 2px dashed #aaa;
+      border-radius: 12px;
+      position: relative;
+      overflow: hidden;
+      background: #f8f8f8;
+      display: none;
+    }
+
+    #resultImg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      max-width: none;
+      max-height: none;
+      cursor: move;
+      user-select: none;
+      width: 100%;
+      height: auto;
     }
   </style>
 </head>
@@ -68,7 +81,6 @@
 
   <h2>📤 Upload & 🧼 Xoá nền ảnh (Uploadcare + Remove.bg)</h2>
 
-  <!-- Widget Uploadcare -->
   <input
     type="hidden"
     role="uploadcare-uploader"
@@ -78,33 +90,39 @@
     id="uploader" />
 
   <button onclick="removeBackground()" id="removeBtn" disabled>🧼 Xoá nền ảnh</button>
+  <button onclick="resetImage()">📍 Đặt lại vào giữa</button>
+  <button onclick="zoomIn()">➕ Phóng to</button>
+  <button onclick="zoomOut()">➖ Thu nhỏ</button>
 
   <div id="status"></div>
-  <img id="resultImg" style="display:none;">
+  <div id="imageContainer">
+    <img id="resultImg" draggable="false">
+  </div>
   <a id="download" download="no-bg.png" style="display:none;">⬇️ Tải ảnh đã xoá nền</a>
   <div id="linkResult"></div>
 
   <script>
     let uploadedImageUrl = "";
     let uploadedBlob = null;
+    const resultImg = document.getElementById("resultImg");
+    const imageContainer = document.getElementById("imageContainer");
+    let scale = 1;
+    let isDragging = false, offsetX = 0, offsetY = 0;
 
-    // Lắng nghe khi người dùng chọn ảnh từ Uploadcare
     uploadcare.Widget('[role=uploadcare-uploader]').onUploadComplete(async (info) => {
       uploadedImageUrl = info.cdnUrl;
       document.getElementById("status").textContent = "✅ Ảnh đã được tải lên Uploadcare.";
       document.getElementById("removeBtn").disabled = false;
-      document.getElementById("resultImg").src = uploadedImageUrl;
-      document.getElementById("resultImg").style.display = "block";
+      resultImg.src = uploadedImageUrl;
+      imageContainer.style.display = "block";
       document.getElementById("linkResult").innerHTML = `📎 Link ảnh Uploadcare: <a href="${uploadedImageUrl}" target="_blank">${uploadedImageUrl}</a>`;
 
-      // Tải blob từ URL
       const res = await fetch(uploadedImageUrl);
       uploadedBlob = await res.blob();
     });
 
     async function removeBackground() {
       const status = document.getElementById('status');
-      const resultImg = document.getElementById('resultImg');
       const linkResult = document.getElementById('linkResult');
       const downloadLink = document.getElementById('download');
 
@@ -138,7 +156,12 @@
         const imageUrl = URL.createObjectURL(blob);
 
         resultImg.src = imageUrl;
-        resultImg.style.display = "block";
+        imageContainer.style.display = "block";
+        resultImg.style.top = "0px";
+        resultImg.style.left = "0px";
+        scale = 1;
+        applyTransform();
+
         downloadLink.href = imageUrl;
         downloadLink.style.display = "inline-block";
         status.textContent = "✅ Đã xoá nền thành công!";
@@ -148,6 +171,47 @@
         status.textContent = "❌ Lỗi xoá nền: " + err.message;
         console.error(err);
       }
+    }
+
+    function resetImage() {
+      scale = 1;
+      resultImg.style.top = "0px";
+      resultImg.style.left = "0px";
+      resultImg.style.transform = "scale(1)";
+    }
+
+    function zoomIn() {
+      scale += 0.1;
+      applyTransform();
+    }
+
+    function zoomOut() {
+      scale = Math.max(0.1, scale - 0.1);
+      applyTransform();
+    }
+
+    function applyTransform() {
+      resultImg.style.transform = `scale(${scale})`;
+    }
+
+    resultImg.addEventListener("mousedown", (e) => {
+      isDragging = true;
+      const rect = resultImg.getBoundingClientRect();
+      offsetX = e.clientX - rect.left;
+      offsetY = e.clientY - rect.top;
+    });
+
+    document.addEventListener("mouseup", () => isDragging = false);
+    document.addEventListener("mousemove", drag);
+
+    function drag(e) {
+      if (!isDragging) return;
+      const containerRect = imageContainer.getBoundingClientRect();
+      let left = e.clientX - containerRect.left - offsetX;
+      let top = e.clientY - containerRect.top - offsetY;
+
+      resultImg.style.left = `${left}px`;
+      resultImg.style.top = `${top}px`;
     }
   </script>
 
